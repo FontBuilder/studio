@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; font-src 'self' data:; object-src 'none'; base-uri 'self'">
+    <meta name="fbs-mode" content="static">
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Font Builder Studio</title>
+    <meta name="description" content="Browse and edit fonts in your browser. Open a TrueType or OpenType file, inspect and edit outlines, spacing and Unicode coverage. Runs entirely on this page - no upload, nothing sent anywhere.">
+    <link rel="stylesheet" href="./static/theme.css">
+    <link rel="stylesheet" href="./static/editor.css">
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%237c3aed'/%3E%3Ctext x='16' y='23' font-size='19' text-anchor='middle' fill='white' font-family='serif'%3EA%3C/text%3E%3C/svg%3E">
+</head>
+<body id="top">
+<div class="app-shell">
+    <header class="app-header">
+        <div class="brand">
+            <span class="brand-logo" aria-hidden="true">
+                <svg viewBox="0 0 32 32" width="28" height="28">
+                    <rect width="32" height="32" rx="6" fill="url(#g)"></rect>
+                    <defs>
+                        <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+                            <stop offset="0" stop-color="#a855f7"></stop>
+                            <stop offset="1" stop-color="#7c3aed"></stop>
+                        </linearGradient>
+                    </defs>
+                    <text x="16" y="23" font-size="19" text-anchor="middle" fill="#fff" font-family="serif">A</text>
+                </svg>
+            </span>
+            <div class="brand-text">
+                <h1>Font Builder Studio</h1>
+                <p>Browser-based font editor</p>
+            </div>
+        </div>
+        <div></div>
+        <div class="header-actions">
+            <div class="menu-wrap">
+                <button class="btn-ghost" id="projectsBtn" type="button"
+                        aria-haspopup="true" aria-expanded="false">Projects &#9662;</button>
+                <div class="menu" id="projectsMenu" hidden>
+                    <label>Project name
+                        <input type="text" id="projectName" placeholder="My font">
+                    </label>
+                    <div class="btn-row">
+                        <button class="btn-primary" id="saveProjectBtn" type="button">Save</button>
+                        <button class="btn-secondary" id="saveAsProjectBtn" type="button">Save as</button>
+                    </div>
+                    <button class="btn-secondary full" id="newFontBtn" type="button">+ New empty font</button>
+                    <div class="menu-sep"></div>
+                    <div class="menu-head">
+                        <span>Saved projects</span>
+                        <span class="badge" id="projectBadge">&nbsp;</span>
+                    </div>
+                    <div class="glyph-list" id="projectList"></div>
+                    <p class="hint" id="projectNote" style="margin-top:6px;"></p>
+                </div>
+            </div>
+            <div id="authHeader" class="auth-header"></div>
+            <button class="btn-ghost" id="undoBtn" type="button" title="Undo (Ctrl+Z)">Undo</button>
+            <button class="btn-ghost" id="redoBtn" type="button" title="Redo (Ctrl+Shift+Z)">Redo</button>
+        </div>
+    </header>
+
+    <!-- Static builds keep everything in the page's memory, so a refresh wipes
+         it. Shown only in static mode (see app.js / runtime.js). -->
+    <div class="data-warning" id="dataWarning" role="alert" hidden>
+        <span class="data-warning-icon" aria-hidden="true">&#9888;</span>
+        <p><strong>This is a Static Page version. Nothing here is saved automatically.</strong>
+            <span id="dataWarningText"></span></p>
+        <button class="btn-ghost" id="dataWarningDismiss" type="button">Dismiss</button>
+    </div>
+
+    <main class="layout">
+        <!-- ============ LEFT: ALL EDITING PANELS ============ -->
+        <aside class="sidebar" aria-label="Editing panels">
+
+            <!-- 1. Font metadata (collapsed by default) -->
+            <details class="panel" id="panelFont">
+                <summary class="panel-head"><span class="panel-title">Font</span></summary>
+                <label>Family
+                    <input type="text" id="fontFamily" placeholder="Untitled">
+                </label>
+                <label>Style
+                    <input type="text" id="fontStyle" placeholder="Regular">
+                </label>
+                <label>Units per em
+                    <input type="number" id="fontEm" min="1" max="16384" step="1" placeholder="1000">
+                </label>
+                <div class="stat-grid" id="fontStats" style="margin-top:10px;"></div>
+            </details>
+
+            <!-- 2. Current glyph (+ adding new ones) -->
+            <details class="panel" open>
+                <summary class="panel-head">
+                    <span class="panel-title">Glyph</span>
+                    <span class="badge" id="glyphCodepoint">&mdash;</span>
+                </summary>
+                <label>Name
+                    <input type="text" id="glyphName" placeholder="A">
+                </label>
+                <label>Unicode code point
+                    <span class="input-group">
+                        <input type="text" id="glyphUnicode" placeholder="U+0041"
+                               autocomplete="off" spellcheck="false">
+                        <button class="btn-icon" id="browseGlyph" type="button"
+                                title="Browse characters by name" aria-label="Browse characters by name">
+                            <svg viewBox="0 0 16 16" width="14" height="14" fill="none"
+                                 stroke="currentColor" stroke-width="1.3" stroke-linecap="round"
+                                 stroke-linejoin="round" aria-hidden="true">
+                                <path d="M1.3 12.4 4.6 4.2l3.3 8.2"/>
+                                <path d="M2.5 9.6h4.2"/>
+                                <circle cx="11.5" cy="9.7" r="2.5"/>
+                                <path d="M14 7.2v5.2"/>
+                            </svg>
+                        </button>
+                    </span>
+                </label>
+                <!-- Steppers are duplicated per readout on purpose: whichever of
+                     the three forms you happen to be reading, the nudge is
+                     under the cursor. All three do the same thing. -->
+                <div class="readout" id="unicodeReadout">
+                    <div class="u-cell">
+                        <span class="u-label">char</span>
+                        <div class="u-line">
+                            <span class="u-char" id="unicodeChar" title="The character this code point represents">&mdash;</span>
+                            <span class="u-keys">
+                                <button type="button" class="u-step" data-step="1" tabindex="-1" title="Next code point (hold Shift for 16)">&#9650;</button>
+                                <button type="button" class="u-step" data-step="-1" tabindex="-1" title="Previous code point (hold Shift for 16)">&#9660;</button>
+                            </span>
+                        </div>
+                    </div>
+                    <div class="u-cell">
+                        <span class="u-label">hex</span>
+                        <div class="u-line">
+                            <b class="u-value" id="unicodeHex">&mdash;</b>
+                            <span class="u-keys">
+                                <button type="button" class="u-step" data-step="1" tabindex="-1" title="Next code point (hold Shift for 16)">&#9650;</button>
+                                <button type="button" class="u-step" data-step="-1" tabindex="-1" title="Previous code point (hold Shift for 16)">&#9660;</button>
+                            </span>
+                        </div>
+                    </div>
+                    <div class="u-cell">
+                        <span class="u-label">decimal</span>
+                        <div class="u-line">
+                            <b class="u-value" id="unicodeDec">&mdash;</b>
+                            <span class="u-keys">
+                                <button type="button" class="u-step" data-step="1" tabindex="-1" title="Next code point (hold Shift for 16)">&#9650;</button>
+                                <button type="button" class="u-step" data-step="-1" tabindex="-1" title="Previous code point (hold Shift for 16)">&#9660;</button>
+                            </span>
+                        </div>
+                    </div>
+                </div>
+                <p class="hint" id="unicodeHint">Accepts U+0041, 0x41 or 65 (decimal). Blank = unencoded.</p>
+
+                <div class="field-row">
+                    <label>Advance width
+                        <span class="input-group">
+                            <input type="number" id="glyphWidth" step="1"
+                                   title="How far the pen advances after drawing this glyph, in font units. Advance width = LSB + ink width + RSB.">
+                            <button class="btn-icon" id="resetWidth" type="button"
+                                    title="Reset advance width" aria-label="Reset advance width">&#8634;</button>
+                        </span>
+                    </label>
+                    <label>LSB
+                        <span class="input-group">
+                            <input type="number" id="glyphLsb" step="1"
+                                   title="Left side bearing: the gap from the origin (x=0) to the leftmost point of the drawing. Changing it slides the whole glyph sideways, and the advance width moves with it so the right sidebearing stays the same.">
+                            <button class="btn-icon" id="resetLsb" type="button"
+                                    title="Reset left side bearing" aria-label="Reset left side bearing">&#8634;</button>
+                        </span>
+                    </label>
+                </div>
+                <!-- The three numbers that make up the spacing, so the two fields
+                     above are not just bare integers. -->
+                <div class="readout" id="spacingReadout">
+                    <div class="u-cell">
+                        <span class="u-label">left</span>
+                        <div class="u-line"><b class="u-value" id="spLsb">&mdash;</b></div>
+                    </div>
+                    <div class="u-cell">
+                        <span class="u-label">ink</span>
+                        <div class="u-line"><b class="u-value" id="spInk">&mdash;</b></div>
+                    </div>
+                    <div class="u-cell">
+                        <span class="u-label">right</span>
+                        <div class="u-line"><b class="u-value" id="spRsb">&mdash;</b></div>
+                    </div>
+                </div>
+                <p class="hint" id="spacingHint">LSB + ink + RSB = advance width.</p>
+                <div class="btn-row">
+                    <button class="btn-secondary" id="duplicateGlyph" type="button">Duplicate</button>
+                    <button class="btn-ghost" id="deleteGlyph" type="button">Delete glyph</button>
+                </div>
+
+                <div class="panel-sep"></div>
+                <div class="panel-subhead">Add a new glyph</div>
+                <div class="field-row">
+                    <label>Name<input type="text" id="newGlyphName" placeholder="A"></label>
+                    <label>Unicode
+                        <span class="input-group">
+                            <input type="text" id="newGlyphCode" placeholder="U+0041"
+                                   autocomplete="off" spellcheck="false">
+                            <button class="btn-icon" id="browseNewGlyph" type="button"
+                                    title="Browse characters by name" aria-label="Browse characters by name">
+                                <svg viewBox="0 0 16 16" width="14" height="14" fill="none"
+                                     stroke="currentColor" stroke-width="1.3" stroke-linecap="round"
+                                     stroke-linejoin="round" aria-hidden="true">
+                                    <path d="M1.3 12.4 4.6 4.2l3.3 8.2"/>
+                                    <path d="M2.5 9.6h4.2"/>
+                                    <circle cx="11.5" cy="9.7" r="2.5"/>
+                                    <path d="M14 7.2v5.2"/>
+                                </svg>
+                            </button>
+                        </span>
+                    </label>
+                </div>
+                <button class="btn-secondary full" id="addGlyphBtn" type="button">Add glyph</button>
+            </details>
+
+            <!-- 3. Glyph list -->
+            <details class="panel" open>
+                <summary class="panel-head">
+                    <span class="panel-title">Glyphs</span>
+                    <span class="badge" id="glyphCount">&nbsp;</span>
+                </summary>
+                <input type="search" id="glyphSearch" placeholder="Filter: name, U+code, is:empty"
+                       title="Search by glyph name or code point. Keywords: is:drawn, is:composite, is:empty, is:encoded, is:unencoded">
+                <div class="glyph-list" id="glyphList" style="max-height:320px;"></div>
+            </details>
+
+            <!-- 4. Transform -->
+            <details class="panel">
+                <summary class="panel-head"><span class="panel-title">Transform</span></summary>
+                <p class="hint">Applies to the selected points, or the whole glyph when nothing is selected.</p>
+                <div class="btn-row">
+                    <button class="btn-secondary" id="flipH" type="button">Flip H</button>
+                    <button class="btn-secondary" id="flipV" type="button">Flip V</button>
+                </div>
+                <div class="field-row">
+                    <label>Scale X %<input type="number" id="scaleX" value="100" step="1"></label>
+                    <label>Scale Y %<input type="number" id="scaleY" value="100" step="1"></label>
+                </div>
+                <div class="field-row">
+                    <label>Rotate &deg;<input type="number" id="rotateDeg" value="0" step="1"></label>
+                    <label>Skew X &deg;<input type="number" id="skewX" value="0" step="1"></label>
+                </div>
+                <div class="field-row">
+                    <label>Move X<input type="number" id="moveX" value="0" step="1"></label>
+                    <label>Move Y<input type="number" id="moveY" value="0" step="1"></label>
+                </div>
+                <button class="btn-primary full" id="applyTransform" type="button">Apply transform</button>
+            </details>
+
+            <!-- 5. Cleanup -->
+            <details class="panel">
+                <summary class="panel-head">
+                    <span class="panel-title">Cleanup</span>
+                    <span class="badge" id="opScope">&nbsp;</span>
+                </summary>
+                <p class="hint">FontForge operations, run server-side in an isolated worker.</p>
+                <label>Operation
+                    <select id="opSelect"></select>
+                </label>
+                <label style="display:flex;gap:7px;align-items:center;margin-top:8px;cursor:pointer;">
+                    <input type="checkbox" id="opAllGlyphs" style="width:auto;margin:0;"> Apply to the whole font
+                </label>
+                <button class="btn-secondary full" id="runOpBtn" type="button">Run operation</button>
+                <p class="hint" id="opNote" style="margin-top:6px;"></p>
+            </details>
+
+            <!-- 6. Import -->
+            <details class="panel">
+                <summary class="panel-head">
+                    <span class="panel-title">Import</span>
+                    <span class="hint">max <span id="uploadLimit">25 MB</span></span>
+                </summary>
+                <div class="drop-zone" id="dropZone">
+                    <span class="drop-icon" aria-hidden="true">&#8681;</span>
+                    <p><strong>Drop a font here</strong></p>
+                    <p>or click to browse</p>
+                </div>
+                <input type="file" id="fileInput" hidden
+                       accept=".sfd,.sfdir,.ttf,.otf,.ttc,.woff,.woff2,.ufo,.ufoz,.zip,.pfb,.pfa,.svg,.json">
+                <p class="hint" style="margin-top:6px;" id="importHint"></p>
+            </details>
+
+            <!-- 7. Export (bottom) -->
+            <details class="panel" open>
+                <summary class="panel-head"><span class="panel-title">Export</span></summary>
+                <label>Format
+                    <select id="exportFormat"></select>
+                </label>
+                <button class="btn-primary full" id="exportBtn" type="button">Build &amp; download</button>
+                <p class="hint" style="margin-top:6px;" id="exportNote"></p>
+            </details>
+        </aside>
+
+        <!-- ============ RIGHT: CANVAS ============ -->
+        <section class="canvas-area">
+            <div class="canvas-toolbar">
+                <div class="tool-group">
+                    <button class="tool" id="zoomOut" type="button" title="Zoom out">&minus;</button>
+                    <span class="zoom-readout" id="zoomReadout">100%</span>
+                    <button class="tool" id="zoomIn" type="button" title="Zoom in">+</button>
+                    <button class="tool" id="zoomFit" type="button" title="Fit glyph (F)">Fit</button>
+                </div>
+                <div class="tool-group">
+                    <button class="tool" id="makeOn" type="button" title="Mark selected points on-curve">On-curve</button>
+                    <button class="tool" id="makeOff" type="button" title="Mark selected points off-curve">Off-curve</button>
+                    <button class="tool" id="addContour" type="button" title="Add a closed contour">+ Contour</button>
+                    <button class="tool" id="delContour" type="button" title="Delete the contour containing the selection">Del contour</button>
+                    <button class="tool" id="delPoints" type="button" title="Delete selected points (Delete)">Del points</button>
+                </div>
+                <div class="tool-group">
+                    <button class="tool" id="selectAllBtn" type="button" title="Select every point in this glyph (Ctrl+A)">Select all</button>
+                    <button class="tool" id="copySelBtn" type="button" title="Copy the selected points (Ctrl+C)">Copy</button>
+                    <button class="tool" id="pasteSelBtn" type="button" title="Paste as a new contour (Ctrl+V)">Paste</button>
+                </div>
+                <div class="tool-group">
+                    <button class="tool" id="quickFlipH" type="button" title="Flip the selection horizontally (Shift+H)">Flip H</button>
+                    <button class="tool" id="quickFlipV" type="button" title="Flip the selection vertically (Shift+V)">Flip V</button>
+                    <button class="tool" id="quickRotL" type="button" title="Rotate 90&deg; anticlockwise (Shift+[)">&#8634; 90</button>
+                    <button class="tool" id="quickRotR" type="button" title="Rotate 90&deg; clockwise (Shift+])">&#8635; 90</button>
+                </div>
+                <!-- Neither the marquee nor point insertion has a button, so both need saying. -->
+                <span class="canvas-hint">Drag empty space to select &middot; Space-drag or middle-drag to pan &middot; Double-click the outline to add a point</span>
+            </div>
+
+            <div class="canvas-wrap">
+                <canvas id="glyphCanvas"></canvas>
+                <div class="canvas-empty" id="canvasEmpty">
+                    <div class="empty-inner">
+                        <p class="empty-title" id="emptyTitle">Import a font or start a new one, then pick a glyph.</p>
+                        <p class="empty-note" id="emptyNote" hidden></p>
+                        <div class="empty-actions">
+                            <button class="btn-secondary" id="emptyAction" type="button" hidden>Add a contour</button>
+                            <button class="btn-secondary" id="emptyAction2" type="button" hidden>Compose from template</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="status-bar">
+                <span>glyph <strong id="statGlyph">&mdash;</strong></span>
+                <span>contours <strong id="statContours">0</strong></span>
+                <span>points <strong id="statPoints">0</strong></span>
+                <span>selected <strong id="statSelected">0</strong></span>
+                <span>cursor <strong id="statCursor">&mdash;</strong></span>
+            </div>
+        </section>
+    </main>
+
+    <footer class="app-footer">
+        <span class="footer-note">Font Builder Studio</span>
+        <a class="footer-github" href="https://github.com/jonesckevin/font-builder-studio" target="_blank"
+           rel="noopener noreferrer" title="View the source on GitHub">
+            <svg class="footer-logo" viewBox="0 0 16 16" width="16" height="16"
+                 aria-hidden="true" focusable="false">
+                <path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/>
+            </svg>
+            <span>jonesckevin/font-builder-studio</span>
+        </a>
+    </footer>
+</div>
+
+<!-- Character picker: grouped by Unicode block, searchable by name. -->
+<div class="picker-backdrop" id="pickerBackdrop" hidden>
+    <div class="picker" role="dialog" aria-modal="true" aria-labelledby="pickerTitle">
+        <header class="picker-head">
+            <h2 id="pickerTitle">Choose a character</h2>
+            <input type="search" id="pickerSearch" autocomplete="off" spellcheck="false"
+                   placeholder="Search by name or U+code &mdash; try &ldquo;snowman&rdquo;, &ldquo;arrow&rdquo;, &ldquo;greek&rdquo;"
+                   aria-label="Search characters by name or code point">
+            <button class="btn-ghost picker-close" id="pickerClose" type="button" aria-label="Close">&#10005;</button>
+        </header>
+        <div class="picker-body">
+            <nav class="picker-blocks" id="pickerBlocks" aria-label="Unicode blocks"></nav>
+            <div class="picker-chars">
+                <p class="picker-status" id="pickerStatus"></p>
+                <div class="picker-grid" id="pickerGrid"></div>
+                <button class="btn-secondary full" id="pickerMore" type="button" hidden>Load more</button>
+            </div>
+        </div>
+        <footer class="picker-foot">
+            <div class="picker-detail" id="pickerDetail">Pick a block, or search by name.</div>
+            <button class="btn-primary" id="pickerUse" type="button" disabled>Use character</button>
+        </footer>
+    </div>
+</div>
+
+<div class="toast-host" id="toastHost" aria-live="polite"></div>
+
+<script type="module" src="./static/app.js"></script>
+</body>
+</html>

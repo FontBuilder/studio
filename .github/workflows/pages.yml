@@ -1,0 +1,55 @@
+name: Deploy studio to GitHub Pages
+
+# This repository is the standalone, server-free build of Font Builder Studio:
+# no Python, no FontForge, no build step. Its files are copied in from the parent
+# project, which is why the Unicode index is committed here rather than generated
+# - regenerating it needs FontForge, and this repository has no toolchain at all.
+#
+# Enable once: Settings -> Pages -> Source: GitHub Actions.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # Cheaper than discovering a half-finished copy from the published site.
+      - name: Check the site looks complete
+        run: |
+          for f in index.html .nojekyll static/unicode-index.json; do
+            test -f "$f" || { echo "::error::$f is missing - copy the build in again"; exit 1; }
+          done
+          test -f static/app.js || { echo "::error::static/app.js is missing"; exit 1; }
+          if grep -q '{{' index.html; then
+            echo "::error::index.html still contains unrendered Jinja"
+            exit 1
+          fi
+          du -sh -- * .[!.]* 2>/dev/null || true
+
+      - uses: actions/configure-pages@v5
+
+      # upload-pages-artifact excludes .git and .github from the tar, so the
+      # repository root is the correct thing to point it at.
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
+
+      - id: deployment
+        uses: actions/deploy-pages@v4
