@@ -922,6 +922,32 @@ select:focus {
   white-space: nowrap;
 }
 
+/* Font-resource links, sitting between the note and the repo link. Wraps to a
+   second line rather than overflowing on a narrow window. */
+.footer-links {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 1 auto;
+  flex-wrap: wrap;
+  gap: 2px 4px;
+  min-width: 0;
+}
+
+.footer-links a {
+  padding: 3px 7px;
+  border-radius: var(--radius-sm);
+  color: var(--text-dim);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.footer-links a:hover,
+.footer-links a:focus-visible {
+  color: var(--text);
+  background: var(--brand-soft);
+}
+
 /* Logo + repo name, pinned to the right by the footer's space-between. */
 .footer-github {
   display: inline-flex;

@@ -541,6 +541,42 @@ async function importFiles(fileList) {
   }
 }
 
+/**
+ * Open the editor on the bundled Inter sample instead of an empty canvas.
+ *
+ * Inter (SIL Open Font License) ships next to this module so a new user has a
+ * real font to explore immediately. It only ever runs against an empty document
+ * and re-checks after each await, so a slow fetch can never overwrite work
+ * started in the meantime. A missing sample is not an error - the empty state
+ * still explains what to do - which is why the catch is silent.
+ */
+async function loadSampleFont() {
+  if (doc.doc.glyphs.length) return;
+  try {
+    // Resolved against this module, so it works in both builds: /static/app.js
+    // under Flask, ./static/app.js on the static site.
+    const sample = new URL("Inter-Italic-VariableFont_opsz,wght.ttf", import.meta.url);
+    const response = await fetch(sample);
+    if (!response.ok) return;
+    const blob = await response.blob();
+    const file = new File([blob], "Inter-Italic-VariableFont_opsz,wght.ttf", {
+      type: "font/ttf",
+    });
+    const result = await api.parseFont(file);
+    // The user may have imported or created something while this was loading.
+    if (doc.doc.glyphs.length) return;
+    currentProjectId = null;
+    doc.loadDocument(result.document, "Inter");
+    $("projectName").value = result.document.family_name || "Inter";
+    editor.fit();
+    const stats = result.stats || {};
+    toast(`Inter sample loaded — ${stats.glyphs} glyphs. Start editing, or use “New empty font”.`, "ok");
+  } catch (error) {
+    // A convenience, not a requirement: never block the editor on it.
+    console.warn("Inter sample not loaded:", error);
+  }
+}
+
 async function newFont() {
   setBusy(true, "Creating font…");
   try {
@@ -1223,6 +1259,10 @@ async function boot() {
   if (!$("projectName").value) $("projectName").value = doc.doc.family_name || "Untitled";
   updateAll();
   editor.fit();
+
+  // Open on something real rather than an empty canvas: the bundled Inter
+  // sample gives a new user a font to explore straight away.
+  await loadSampleFont();
 }
 
 /**
